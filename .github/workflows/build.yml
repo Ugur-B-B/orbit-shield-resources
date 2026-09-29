@@ -1,0 +1,54 @@
+name: Build resources.json
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find uBlock Origin's latest release
+        id: ubo
+        run: echo "tag=$(gh api repos/gorhill/uBlock/releases/latest --jq .tag_name)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: gorhill/uBlock
+          ref: ${{ steps.ubo.outputs.tag }}
+          path: ubo
+          sparse-checkout: |
+            /src/js/
+            /src/web_accessible_resources/
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build
+        run: node build.mjs ubo dist/resources.json
+
+      - name: Publish if changed
+        run: |
+          commit=$(git -C ubo rev-parse HEAD)
+          notes="Built from uBlock Origin ${{ steps.ubo.outputs.tag }} (https://github.com/gorhill/uBlock/tree/$commit), GPLv3."
+          if ! gh release view latest > /dev/null 2>&1; then
+            gh release create latest dist/resources.json --title "resources.json" --notes "$notes"
+            exit 0
+          fi
+          gh release download latest --pattern resources.json --dir previous || true
+          if cmp -s dist/resources.json previous/resources.json; then
+            echo "Unchanged."
+          else
+            gh release upload latest dist/resources.json --clobber
+            gh release edit latest --notes "$notes"
+          fi
