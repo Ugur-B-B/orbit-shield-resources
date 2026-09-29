@@ -14,13 +14,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Find uBlock Origin's latest release
         id: ubo
         run: echo "tag=$(gh api repos/gorhill/uBlock/releases/latest --jq .tag_name)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: gorhill/uBlock
           ref: ${{ steps.ubo.outputs.tag }}
@@ -30,9 +30,9 @@ jobs:
             /src/web_accessible_resources/
           sparse-checkout-cone-mode: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Build
         run: node build.mjs ubo dist/resources.json
